@@ -1,6 +1,6 @@
 import PatternGrid from "./components/PatternGrid"
 import { useRef, useState } from 'react'
-import { exportPatternPdf } from './components/PatternPdf'
+import { exportPatternPdf } from './components/pdf/PatternPdf'
 import { createBeadGrid, type BeadCell } from './engine/grid'
 import {
   calculateColorStatistics,
