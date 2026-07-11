@@ -45,22 +45,23 @@ pages.forEach((page, index) => {
     pdf.addPage()
   }
 
-    drawPatternPage({
-      pdf,
-      beadGrid,
-      patternPage: page,
-      totalPatternPages: pages.length,
-      patternSize: size,
-    })
-  })
-
-  pdf.addPage()
-
-  drawColorSummary({
+  drawPatternPage({
     pdf,
     beadGrid,
+    patternPage: page,
+    pages,
+    totalPatternPages: pages.length,
     patternSize: size,
   })
+})
 
-  pdf.save(`beads-pattern-${size}x${size}.pdf`)
+pdf.addPage()
+
+drawColorSummary({
+  pdf,
+  beadGrid,
+  patternSize: size,
+})
+
+pdf.save(`beads-pattern-${size}x${size}.pdf`)
 }

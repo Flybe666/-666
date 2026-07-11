@@ -4,10 +4,12 @@ import type { PatternPage } from './PatternPages'
 
 import { drawOverviewMap } from './OverviewMap'
 import { drawPageMaterials } from './PageMaterials'
+import { drawPageNavigation } from './PageNavigation'
 type DrawPatternPageOptions = {
   pdf: jsPDF
   beadGrid: BeadCell[]
   patternPage: PatternPage
+  pages: PatternPage[]
   totalPatternPages: number
   patternSize: number
 }
@@ -49,9 +51,11 @@ export function drawPatternPage({
   pdf,
   beadGrid,
   patternPage,
+  pages,
   totalPatternPages,
   patternSize,
 }: DrawPatternPageOptions) {
+    
   const {
     pageNumber,
     startRow,
@@ -296,7 +300,14 @@ drawPageMaterials({
     pageHeight - margin,
     { align: 'center' },
   )
-
+drawPageNavigation({
+  pdf,
+  pages,
+  patternPage,
+  pageWidth,
+  pageHeight,
+  margin,
+})
   // 外框
   pdf.setDrawColor(75, 85, 99)
   pdf.setLineWidth(0.4)
