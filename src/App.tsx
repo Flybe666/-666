@@ -1,5 +1,7 @@
+import PatternGrid from "./components/PatternGrid"
 import { useRef, useState } from 'react'
-import { createBeadGrid } from './engine/grid'
+import { exportPatternPdf } from './components/PatternPdf'
+import { createBeadGrid, type BeadCell } from './engine/grid'
 import {
   calculateColorStatistics,
   type ColorStatistic,
@@ -18,7 +20,7 @@ function App() {
   const [previewUrl, setPreviewUrl] = useState('')
   const [isConverted, setIsConverted] = useState(false)
 const [statistics, setStatistics] = useState<ColorStatistic[]>([])
-
+const [beadGrid, setBeadGrid] = useState<BeadCell[]>([])
   function handleFile(file?: File) {
     if (!file || !file.type.startsWith('image/')) return
 
@@ -32,6 +34,9 @@ const [statistics, setStatistics] = useState<ColorStatistic[]>([])
     setPreviewUrl(url)
     setIsConverted(false)
     setStatistics([])
+    setBeadGrid([])
+
+
 
   }
 function convertImage() {
@@ -90,9 +95,9 @@ const originalImageData = context.getImageData(
 )
 
 // 3. 建立拼豆資料與顏色統計
-const beadGrid = createBeadGrid(originalImageData, mard221)
-const colorStatistics = calculateColorStatistics(beadGrid)
-
+const newBeadGrid = createBeadGrid(originalImageData, mard221)
+const colorStatistics = calculateColorStatistics(newBeadGrid)
+setBeadGrid(newBeadGrid)
 setStatistics(colorStatistics)
 
 // 4. 套用目前的測試色盤
@@ -169,7 +174,17 @@ function downloadPng() {
   link.href = downloadCanvas.toDataURL('image/png')
   link.click()
 }
+function downloadPdf() {
+  if (beadGrid.length === 0 || !isConverted) {
+    alert('請先完成圖片轉換。')
+    return
+  }
 
+  exportPatternPdf({
+    beadGrid,
+    size: selectedSize,
+  })
+}
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-pink-50">
       <header className="border-b border-violet-100 bg-white/80">
@@ -253,6 +268,9 @@ function downloadPng() {
   <div className="mt-6">
     <div className="mb-3 flex items-center justify-between">
       <h3 className="text-lg font-bold text-gray-800">
+        <p className="text-sm text-gray-500">
+  已建立 {beadGrid.length} 個拼豆格
+</p>
         顏色統計
       </h3>
 
@@ -326,6 +344,14 @@ function downloadPng() {
   className="mt-3 w-full rounded-2xl border border-violet-500 py-4 font-bold text-violet-600 hover:bg-violet-50 disabled:opacity-40"
 >
   下載 PNG
+  <button
+  type="button"
+ onClick={downloadPdf}
+  disabled={!isConverted}
+  className="mt-3 w-full rounded-2xl border border-pink-500 py-4 font-bold text-pink-600 hover:bg-pink-50 disabled:opacity-40"
+>
+  下載 PDF
+</button>
 </button>
  </aside>
 
@@ -374,6 +400,10 @@ function downloadPng() {
             />
           </div>
         </section>
+        <PatternGrid
+  beadGrid={beadGrid}
+  size={selectedSize}
+/>
       </main>
     </div>
   )
