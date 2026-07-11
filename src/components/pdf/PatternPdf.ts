@@ -3,6 +3,7 @@ import type { BeadCell } from '../../engine/grid'
 import { splitIntoPages } from './PatternPages'
 import { drawPatternPage } from './PdfGrid'
 import { drawColorSummary } from './ColorSummary'
+import { drawCoverPage } from './CoverPage'
 type ExportPatternPdfOptions = {
   beadGrid: BeadCell[]
   size: number
@@ -14,26 +15,35 @@ export function exportPatternPdf({
 }: ExportPatternPdfOptions) {
   if (beadGrid.length === 0) {
     alert('請先完成圖片轉換。')
-    return
+   return
+}
+
+const pages = splitIntoPages(
+  size,
+  size,
+  25,
+  25,
+)
+
+const pdf = new jsPDF({
+  orientation: 'portrait',
+  unit: 'mm',
+  format: 'a4',
+})
+
+drawCoverPage({
+  pdf,
+  beadGrid,
+  patternSize: size,
+  patternPages: pages.length,
+})
+
+pdf.addPage()
+
+pages.forEach((page, index) => {
+  if (index > 0) {
+    pdf.addPage()
   }
-
-  const pages = splitIntoPages(
-    size,
-    size,
-    25,
-    25,
-  )
-
-  const pdf = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  })
-
-  pages.forEach((page, index) => {
-    if (index > 0) {
-      pdf.addPage()
-    }
 
     drawPatternPage({
       pdf,

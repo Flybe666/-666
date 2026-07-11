@@ -2,6 +2,8 @@ import type { jsPDF } from 'jspdf'
 import type { BeadCell } from '../../engine/grid'
 import type { PatternPage } from './PatternPages'
 
+import { drawOverviewMap } from './OverviewMap'
+import { drawPageMaterials } from './PageMaterials'
 type DrawPatternPageOptions = {
   pdf: jsPDF
   beadGrid: BeadCell[]
@@ -65,7 +67,7 @@ export function drawPatternPage({
   const pageHeight = pdf.internal.pageSize.getHeight()
 
   const margin = 12
-  const titleAreaHeight = 25
+  const titleAreaHeight = 55
   const footerHeight = 12
   const coordinateSize = 8
 
@@ -124,7 +126,23 @@ export function drawPatternPage({
     margin + 5,
     { align: 'right' },
   )
-
+drawOverviewMap({
+  pdf,
+  beadGrid,
+  patternSize,
+  patternPage,
+  x: pageWidth - margin - 34,
+  y: margin + 8,
+  width: 28,
+})
+drawPageMaterials({
+  pdf,
+  beadGrid,
+  patternPage,
+  x: margin,
+  y: margin + 29,
+  width: 145,
+})
   // 左上角
   pdf.setFillColor(31, 41, 55)
   pdf.setDrawColor(255, 255, 255)
