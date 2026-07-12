@@ -455,6 +455,7 @@ onClick={() => {
   onLockColor={setLockedColorId}
   selectedBoard={selectedBoard}
   zoom={zoom}
+  setZoom={setZoom}
 />
         </div>
       </main>

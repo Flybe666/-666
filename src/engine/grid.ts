@@ -1,43 +1,81 @@
-import type { BeadColor } from '../data/mard221'
-import { findNearestColor } from './quantize'
+import {
+  createPaletteMatcher,
+  type PaletteColor,
+} from './colorMatcher'
 
-export interface BeadCell {
+export type BeadCell<
+  TColor extends PaletteColor =
+    PaletteColor,
+> = {
   x: number
   y: number
-  color: BeadColor
+  color: TColor
 }
 
-export function createBeadGrid(
+export function createBeadGrid<
+  TColor extends PaletteColor,
+>(
   imageData: ImageData,
-  palette: BeadColor[],
-): BeadCell[] {
-  const cells: BeadCell[] = []
+  palette: readonly TColor[],
+): BeadCell<TColor>[] {
+  const {
+    width,
+    height,
+    data,
+  } = imageData
 
-  for (let y = 0; y < imageData.height; y += 1) {
-    for (let x = 0; x < imageData.width; x += 1) {
-      const index = (y * imageData.width + x) * 4
-      const alpha = imageData.data[index + 3]
+  const matchColor =
+    createPaletteMatcher(palette)
 
-      if (alpha === 0) {
-        continue
-      }
+  const grid: BeadCell<TColor>[] =
+    new Array(width * height)
 
-      const color = findNearestColor(
-        {
-          r: imageData.data[index],
-          g: imageData.data[index + 1],
-          b: imageData.data[index + 2],
-        },
-        palette,
-      )
+  let gridIndex = 0
 
-      cells.push({
+  for (
+    let y = 0;
+    y < height;
+    y += 1
+  ) {
+    for (
+      let x = 0;
+      x < width;
+      x += 1
+    ) {
+      const pixelIndex =
+        (y * width + x) * 4
+
+      const alpha =
+        data[pixelIndex + 3]
+
+      const red =
+        alpha === 0
+          ? 255
+          : data[pixelIndex]
+
+      const green =
+        alpha === 0
+          ? 255
+          : data[pixelIndex + 1]
+
+      const blue =
+        alpha === 0
+          ? 255
+          : data[pixelIndex + 2]
+
+      grid[gridIndex] = {
         x,
         y,
-        color,
-      })
+        color: matchColor(
+          red,
+          green,
+          blue,
+        ),
+      }
+
+      gridIndex += 1
     }
   }
 
-  return cells
+  return grid
 }

@@ -1,76 +1,87 @@
-import type { BeadColor } from '../data/mard221'
+import {
+  createPaletteMatcher,
+  hexToRgb,
+  type PaletteColor,
+} from './colorMatcher'
 
-export interface RGBColor {
-  r: number
-  g: number
-  b: number
-}
-
-function colorDistance(a: RGBColor, b: RGBColor): number {
-  const redDifference = a.r - b.r
-  const greenDifference = a.g - b.g
-  const blueDifference = a.b - b.b
-
-  return (
-    redDifference * redDifference +
-    greenDifference * greenDifference +
-    blueDifference * blueDifference
-  )
-}
-
-export function findNearestColor(
-  source: RGBColor,
-  palette: BeadColor[],
-): BeadColor {
-  if (palette.length === 0) {
-    throw new Error('色盤不可為空')
-  }
-
-  let nearestColor = palette[0]
-  let nearestDistance = colorDistance(source, palette[0])
-
-  for (let index = 1; index < palette.length; index += 1) {
-    const candidate = palette[index]
-    const distance = colorDistance(source, candidate)
-
-    if (distance < nearestDistance) {
-      nearestDistance = distance
-      nearestColor = candidate
-    }
-  }
-
-  return nearestColor
-}
-
-export function quantizeImageData(
-  imageData: ImageData,
-  palette: BeadColor[],
+export function quantizeImageData<
+  TColor extends PaletteColor,
+>(
+  source: ImageData,
+  palette: readonly TColor[],
 ): ImageData {
   const output = new ImageData(
-    new Uint8ClampedArray(imageData.data),
-    imageData.width,
-    imageData.height,
+    new Uint8ClampedArray(
+      source.data.length,
+    ),
+    source.width,
+    source.height,
   )
 
-  for (let index = 0; index < output.data.length; index += 4) {
-    const alpha = output.data[index + 3]
+  const matchColor =
+    createPaletteMatcher(palette)
 
-    if (alpha === 0) {
-      continue
+  const rgbCache =
+    new Map<string, {
+      r: number
+      g: number
+      b: number
+    }>()
+
+  for (
+    let index = 0;
+    index < source.data.length;
+    index += 4
+  ) {
+    const alpha =
+      source.data[index + 3]
+
+    const red =
+      alpha === 0
+        ? 255
+        : source.data[index]
+
+    const green =
+      alpha === 0
+        ? 255
+        : source.data[index + 1]
+
+    const blue =
+      alpha === 0
+        ? 255
+        : source.data[index + 2]
+
+    const nearest =
+      matchColor(
+        red,
+        green,
+        blue,
+      )
+
+    let nearestRgb =
+      rgbCache.get(nearest.hex)
+
+    if (!nearestRgb) {
+      nearestRgb =
+        hexToRgb(nearest.hex)
+
+      rgbCache.set(
+        nearest.hex,
+        nearestRgb,
+      )
     }
 
-    const nearest = findNearestColor(
-      {
-        r: output.data[index],
-        g: output.data[index + 1],
-        b: output.data[index + 2],
-      },
-      palette,
-    )
+    output.data[index] =
+      nearestRgb.r
 
-    output.data[index] = nearest.r
-    output.data[index + 1] = nearest.g
-    output.data[index + 2] = nearest.b
+    output.data[index + 1] =
+      nearestRgb.g
+
+    output.data[index + 2] =
+      nearestRgb.b
+
+    output.data[index + 3] =
+      255
   }
 
   return output
