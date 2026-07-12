@@ -1,4 +1,4 @@
-import PatternGrid from "./components/PatternGrid"
+import PatternGrid from './components/PatternGrid'
 import { useRef, useState } from 'react'
 import { exportPatternPdf } from './components/pdf/PatternPdf'
 import { createBeadGrid, type BeadCell } from './engine/grid'
@@ -8,26 +8,71 @@ import {
 } from './engine/statistics'
 import { mard221 } from './data/mard221'
 import { quantizeImageData } from './engine/quantize'
+import { PdfSettingsPanel } from './components/PdfSettingsPanel'
+import {
+  defaultPdfSettings,
+  type PdfSettings,
+} from './components/pdf/PdfSettings'
+import { PreviewPanel } from './components/pdf/PreviewPanel'
+import { StatisticsPanel } from './components/StatisticsPanel'
+import { createBoardLayout } from './engine/boardLayout'
+import type { BoardSection } from './types/board'
+import BoardNavigator from './components/BoardNavigator'
 
 const sizes = [29, 58, 104, 128, 208]
 
 function App() {
   const inputRef = useRef<HTMLInputElement>(null)
-  const sourceCanvasRef = useRef<HTMLCanvasElement>(null)
+  const sourceCanvasRef =
+    useRef<HTMLCanvasElement>(null)
 
-  const [selectedSize, setSelectedSize] = useState(104)
-  const [fileName, setFileName] = useState('')
-  const [previewUrl, setPreviewUrl] = useState('')
-  const [isConverted, setIsConverted] = useState(false)
-const [statistics, setStatistics] = useState<ColorStatistic[]>([])
-const [beadGrid, setBeadGrid] = useState<BeadCell[]>([])
+  const [selectedSize, setSelectedSize] =
+    useState(104)
+
+  const [boards, setBoards] =
+    useState<BoardSection[]>([])
+
+  const [selectedBoard, setSelectedBoard] =
+    useState<BoardSection | null>(null)
+
+  const [zoom, setZoom] =
+     useState(1)
+
+  const [fileName, setFileName] =
+    useState('')
+
+  const [previewUrl, setPreviewUrl] =
+    useState('')
+
+  const [isConverted, setIsConverted] =
+    useState(false)
+
+  const [statistics, setStatistics] =
+    useState<ColorStatistic[]>([])
+
+  const [hoveredColorId, setHoveredColorId] =
+    useState<string | null>(null)
+
+  const [lockedColorId, setLockedColorId] =
+    useState<string | null>(null)
+
+  const activeColorId =
+    lockedColorId ?? hoveredColorId
+
+  const [beadGrid, setBeadGrid] =
+    useState<BeadCell[]>([])
+
+  const [pdfSettings, setPdfSettings] =
+    useState<PdfSettings>(defaultPdfSettings)
+
   function handleFile(file?: File) {
-    if (!file || !file.type.startsWith('image/')) return
+    if (!file || !file.type.startsWith('image/')) {
+      return
+    }
 
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl)
     }
-
     const url = URL.createObjectURL(file)
 
     setFileName(file.name)
@@ -35,13 +80,20 @@ const [beadGrid, setBeadGrid] = useState<BeadCell[]>([])
     setIsConverted(false)
     setStatistics([])
     setBeadGrid([])
-
+setBoards([])
+setSelectedBoard(null)
 
 
   }
 function convertImage() {
     if (!previewUrl || !sourceCanvasRef.current) return
 
+const newBoards = createBoardLayout(
+  selectedSize,
+  29,
+)
+
+setBoards(newBoards)
     const image = new Image()
     image.src = previewUrl
 
@@ -181,9 +233,10 @@ function downloadPdf() {
   }
 
   exportPatternPdf({
-    beadGrid,
-    size: selectedSize,
-  })
+  beadGrid,
+  size: selectedSize,
+  settings: pdfSettings,
+})
 }
   return (
     <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-pink-50">
@@ -250,10 +303,12 @@ function downloadPdf() {
                 <button
                   key={size}
                   type="button"
-                  onClick={() => {
-                    setSelectedSize(size)
-                    setIsConverted(false)
-                  }}
+onClick={() => {
+  setSelectedSize(size)
+  setIsConverted(false)
+  setBoards([])
+  setSelectedBoard(null)
+}}
                   className={`rounded-xl px-3 py-3 text-sm font-semibold ${
                     selectedSize === size
                       ? 'bg-violet-600 text-white'
@@ -264,57 +319,20 @@ function downloadPdf() {
                 </button>
               ))}
             </div>
-            {statistics.length > 0 && (
-  <div className="mt-6">
-    <div className="mb-3 flex items-center justify-between">
-      <h3 className="text-lg font-bold text-gray-800">
-        <p className="text-sm text-gray-500">
-  已建立 {beadGrid.length} 個拼豆格
-</p>
-        顏色統計
-      </h3>
+<StatisticsPanel
+  statistics={statistics}
+  beadCount={beadGrid.length}
+  activeColorId={activeColorId}
+  lockedColorId={lockedColorId}
+  onHoverColor={setHoveredColorId}
+  onLockColor={setLockedColorId}
+/>
 
-      <span className="text-sm text-gray-500">
-        共{' '}
-        {statistics.reduce(
-          (total, item) => total + item.count,
-          0,
-        )}{' '}
-        顆
-      </span>
-    </div>
-
-    <div className="max-h-72 overflow-y-auto rounded-2xl border border-gray-200 bg-white">
-      {statistics.map((item) => (
-        <div
-          key={item.id}
-          className="flex items-center justify-between border-b border-gray-100 px-4 py-3 last:border-b-0"
-        >
-          <div className="flex items-center gap-3">
-            <span
-              className="h-7 w-7 shrink-0 rounded-lg border border-gray-300"
-              style={{ backgroundColor: item.hex }}
-            />
-
-            <div>
-              <p className="font-semibold text-gray-800">
-                {item.id} · {item.name}
-              </p>
-              <p className="text-xs text-gray-500">
-                {item.hex}
-              </p>
-            </div>
-          </div>
-
-          <span className="rounded-full bg-violet-100 px-3 py-1 text-sm font-bold text-violet-700">
-            {item.count} 顆
-          </span>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-
+<BoardNavigator
+  boards={boards}
+  selectedBoardId={selectedBoard?.id ?? null}
+  onSelectBoard={setSelectedBoard}
+/>
           </section>
 
           <section>
@@ -329,6 +347,11 @@ function downloadPdf() {
             </select>
           </section>
 
+          <PdfSettingsPanel
+            settings={pdfSettings}
+            onChange={setPdfSettings}
+          />
+
           <button
             type="button"
             onClick={convertImage}
@@ -337,28 +360,35 @@ function downloadPdf() {
           >
             開始轉換
           </button>
-<button
-  type="button"
-  onClick={downloadPng}
-  disabled={!isConverted}
-  className="mt-3 w-full rounded-2xl border border-violet-500 py-4 font-bold text-violet-600 hover:bg-violet-50 disabled:opacity-40"
->
-  下載 PNG
-  <button
-  type="button"
- onClick={downloadPdf}
-  disabled={!isConverted}
-  className="mt-3 w-full rounded-2xl border border-pink-500 py-4 font-bold text-pink-600 hover:bg-pink-50 disabled:opacity-40"
->
-  下載 PDF
-</button>
-</button>
- </aside>
+
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={downloadPng}
+              disabled={!isConverted}
+              className="w-full rounded-2xl border border-violet-500 py-4 font-bold text-violet-600 hover:bg-violet-50 disabled:opacity-40"
+            >
+              下載 PNG
+            </button>
+
+            <button
+              type="button"
+              onClick={downloadPdf}
+              disabled={!isConverted}
+              className="w-full rounded-2xl border border-pink-500 py-4 font-bold text-pink-600 hover:bg-pink-50 disabled:opacity-40"
+            >
+              下載 PDF
+            </button>
+          </div>
+        </aside>
 
         <section className="min-h-[600px] rounded-3xl border border-violet-100 bg-white p-6 shadow-sm">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-800">拼豆預覽</h2>
+              <h2 className="text-xl font-bold text-gray-800">
+                拼豆預覽
+              </h2>
+
               <p className="text-sm text-gray-500">
                 目前尺寸：{selectedSize}×{selectedSize}
               </p>
@@ -369,41 +399,64 @@ function downloadPdf() {
             </span>
           </div>
 
-          <div className="flex min-h-[500px] items-center justify-center rounded-2xl bg-gray-50 p-6">
-            {!previewUrl && (
-              <div className="text-center text-gray-400">
-                <div className="text-6xl">🧩</div>
-                <p className="mt-4 text-lg font-medium">
-                  上傳圖片後會顯示在這裡
-                </p>
-              </div>
-            )}
+          <PreviewPanel imageUrl={previewUrl} />
 
-            {previewUrl && !isConverted && (
-              <img
-                src={previewUrl}
-                alt="原始圖片預覽"
-                className="max-h-[500px] max-w-full rounded-xl object-contain shadow-xl"
-              />
-            )}
-
-            <canvas
-              ref={sourceCanvasRef}
-              className={`max-h-[500px] max-w-full rounded-xl border border-gray-200 shadow-xl ${
-                isConverted ? 'block' : 'hidden'
-              }`}
-              style={{
-                imageRendering: 'pixelated',
-                width: 'min(100%, 500px)',
-                aspectRatio: '1 / 1',
-              }}
-            />
-          </div>
+          <canvas
+            ref={sourceCanvasRef}
+            className="hidden"
+            width={selectedSize}
+            height={selectedSize}
+            style={{
+              imageRendering: 'pixelated',
+            }}
+          />
         </section>
-        <PatternGrid
+
+        <div className="min-w-0 overflow-x-auto lg:col-span-2">
+          <div className="mb-3 flex items-center justify-end gap-2">
+  <button
+    type="button"
+    onClick={() =>
+      setZoom((current) =>
+        Math.max(0.25, current - 0.25),
+      )
+    }
+    className="rounded-lg border border-violet-300 px-3 py-2 font-bold text-violet-700 hover:bg-violet-50"
+  >
+    −
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setZoom(1)}
+    className="rounded-lg bg-violet-100 px-4 py-2 font-bold text-violet-700"
+  >
+    {Math.round(zoom * 100)}%
+  </button>
+
+  <button
+    type="button"
+    onClick={() =>
+      setZoom((current) =>
+        Math.min(4, current + 0.25),
+      )
+    }
+    className="rounded-lg border border-violet-300 px-3 py-2 font-bold text-violet-700 hover:bg-violet-50"
+  >
+    ＋
+  </button>
+</div>
+<PatternGrid
   beadGrid={beadGrid}
   size={selectedSize}
+  hoveredColorId={hoveredColorId}
+  lockedColorId={lockedColorId}
+  onHoverColor={setHoveredColorId}
+  onLockColor={setLockedColorId}
+  selectedBoard={selectedBoard}
+  zoom={zoom}
 />
+        </div>
       </main>
     </div>
   )

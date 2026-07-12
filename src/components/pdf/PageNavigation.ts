@@ -46,37 +46,36 @@ export function drawPageNavigation({
   pdf.setFontSize(8)
 
   if (topPage) {
-    pdf.text(
-      `Up: Page ${topPage.pageNumber}`,
-      pageWidth / 2,
-      margin - 3,
-      { align: 'center' },
-    )
+pdf.text(
+  `^ P${topPage.pageNumber}`,
+  pageWidth / 2,
+  margin - 3,
+  { align: 'center' },
+)
   }
 
   if (bottomPage) {
-    pdf.text(
-      `Down: Page ${bottomPage.pageNumber}`,
-      pageWidth / 2,
-      pageHeight - margin + 5,
-      { align: 'center' },
-    )
+  pdf.text(
+  `v P${bottomPage.pageNumber}`,
+  pageWidth / 2,
+  pageHeight - margin + 5,
+  { align: 'center' },
+)
   }
-
-  if (leftPage) {
-    pdf.text(
-      `Left: Page ${leftPage.pageNumber}`,
-      margin,
-      pageHeight - margin,
-    )
+if (leftPage) {
+pdf.text(
+  `< P${leftPage.pageNumber}`,
+  margin,
+  pageHeight - margin,
+)
   }
 
   if (rightPage) {
-    pdf.text(
-      `Right: Page ${rightPage.pageNumber}`,
-      pageWidth - margin,
-      pageHeight - margin,
-      { align: 'right' },
-    )
+  pdf.text(
+  `> P${rightPage.pageNumber}`,
+  pageWidth - margin,
+  pageHeight - margin,
+  { align: 'right' },
+)
   }
 }

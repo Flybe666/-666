@@ -5,15 +5,16 @@ import type { PatternPage } from './PatternPages'
 import { drawOverviewMap } from './OverviewMap'
 import { drawPageMaterials } from './PageMaterials'
 import { drawPageNavigation } from './PageNavigation'
-type DrawPatternPageOptions = {
+import type { PdfSettings } from './PdfSettings'
+interface DrawPatternPageOptions {
   pdf: jsPDF
   beadGrid: BeadCell[]
   patternPage: PatternPage
   pages: PatternPage[]
   totalPatternPages: number
   patternSize: number
+  settings: PdfSettings
 }
-
 function hexToRgb(hex: string) {
   const normalized = hex.replace('#', '')
 
@@ -46,7 +47,6 @@ function getRowLabel(index: number) {
 
   return label
 }
-
 export function drawPatternPage({
   pdf,
   beadGrid,
@@ -54,8 +54,8 @@ export function drawPatternPage({
   pages,
   totalPatternPages,
   patternSize,
+  settings,
 }: DrawPatternPageOptions) {
-    
   const {
     pageNumber,
     startRow,
@@ -130,23 +130,27 @@ export function drawPatternPage({
     margin + 5,
     { align: 'right' },
   )
-drawOverviewMap({
-  pdf,
-  beadGrid,
-  patternSize,
-  patternPage,
-  x: pageWidth - margin - 34,
-  y: margin + 8,
-  width: 28,
-})
-drawPageMaterials({
-  pdf,
-  beadGrid,
-  patternPage,
-  x: margin,
-  y: margin + 29,
-  width: 145,
-})
+if (settings.showOverview) {
+  drawOverviewMap({
+    pdf,
+    beadGrid,
+    patternSize,
+    patternPage,
+    x: pageWidth - margin - 34,
+    y: margin + 8,
+    width: 28,
+  })
+}
+if (settings.showPageMaterials) {
+  drawPageMaterials({
+    pdf,
+    beadGrid,
+    patternPage,
+    x: margin,
+    y: margin + 29,
+    width: 145,
+  })
+}
   // 左上角
   pdf.setFillColor(31, 41, 55)
   pdf.setDrawColor(255, 255, 255)
@@ -205,6 +209,8 @@ drawPageMaterials({
   }
 
   // 左側列號與拼豆格
+  pdf.setLineWidth(0.15)
+
   for (
     let row = startRow;
     row < endRow;
@@ -289,28 +295,78 @@ drawPageMaterials({
       )
     }
   }
+  // 每 5 格加粗分隔線
+  pdf.setDrawColor(75, 85, 99)
+  pdf.setLineWidth(0.8)
 
+  // 垂直粗線：第 5、10、15...欄之後
+  for (
+    let columnBoundary = startColumn + 1;
+    columnBoundary < endColumn;
+    columnBoundary += 1
+  ) {
+    if (columnBoundary % 5 !== 0) {
+      continue
+    }
+
+    const lineX =
+      startX +
+      coordinateSize +
+      (columnBoundary - startColumn) * cellSize
+
+    pdf.line(
+      lineX,
+      startY,
+      lineX,
+      startY + gridHeight,
+    )
+  }
+
+  // 水平粗線：第 5、10、15...列之後
+  for (
+    let rowBoundary = startRow + 1;
+    rowBoundary < endRow;
+    rowBoundary += 1
+  ) {
+    if (rowBoundary % 5 !== 0) {
+      continue
+    }
+
+    const lineY =
+      startY +
+      coordinateSize +
+      (rowBoundary - startRow) * cellSize
+
+    pdf.line(
+      startX,
+      lineY,
+      startX + gridWidth,
+      lineY,
+    )
+  }
   // 頁尾
   pdf.setTextColor(107, 114, 128)
   pdf.setFontSize(8)
 
   pdf.text(
-    `Section: row page ${patternPage.rowPage}, column page ${patternPage.columnPage}`,
+   `Section ${getRowLabel(patternPage.rowPage - 1)}${patternPage.columnPage}`,
     pageWidth / 2,
     pageHeight - margin,
     { align: 'center' },
   )
-drawPageNavigation({
-  pdf,
-  pages,
-  patternPage,
-  pageWidth,
-  pageHeight,
-  margin,
-})
+if (settings.showNavigation) {
+  drawPageNavigation({
+    pdf,
+    pages,
+    patternPage,
+    pageWidth,
+    pageHeight,
+    margin,
+  })
+}
   // 外框
   pdf.setDrawColor(75, 85, 99)
-  pdf.setLineWidth(0.4)
+  pdf.setLineWidth(1)
 
   pdf.rect(
     startX,

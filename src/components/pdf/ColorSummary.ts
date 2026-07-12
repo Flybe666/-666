@@ -46,17 +46,25 @@ export function drawColorSummary({
     }
   }
 
-  const summaryItems = [...summaryMap.values()].sort((a, b) =>
-    a.id.localeCompare(b.id, undefined, {
-      numeric: true,
-    }),
+  const summaryItems = [...summaryMap.values()].sort(
+    (a, b) => b.count - a.count,
   )
+
+  const totalBeads = beadGrid.length
+  const beadsPerBag = 1000
 
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
 
   const margin = 18
-  const rowHeight = 10
+  const rowHeight = 11
+
+  const colorX = margin
+  const idX = margin + 12
+  const nameX = margin + 34
+  const countX = pageWidth - 70
+  const percentX = pageWidth - 42
+  const bagsX = pageWidth - margin
 
   let y = 22
 
@@ -68,21 +76,22 @@ export function drawColorSummary({
     y += 11
 
     pdf.setFontSize(10)
+
     pdf.text(
       `Pattern size: ${patternSize} x ${patternSize}`,
       margin,
       y,
     )
 
-    y += 7
+    y += 6
 
     pdf.text(
-      `Total beads: ${beadGrid.length}`,
+      `Total beads: ${totalBeads}`,
       margin,
       y,
     )
 
-    y += 7
+    y += 6
 
     pdf.text(
       `Colors used: ${summaryItems.length}`,
@@ -90,24 +99,63 @@ export function drawColorSummary({
       y,
     )
 
+    y += 6
+
+    pdf.text(
+      `Bag estimate: ${beadsPerBag} beads per bag`,
+      margin,
+      y,
+    )
+
     y += 12
+
+    pdf.setFillColor(243, 244, 246)
+    pdf.setDrawColor(209, 213, 219)
+
+    pdf.rect(
+      margin,
+      y - 6,
+      pageWidth - margin * 2,
+      9,
+      'FD',
+    )
+
+    pdf.setTextColor(55, 65, 81)
+    pdf.setFontSize(9)
+
+    pdf.text('Color', colorX, y)
+    pdf.text('ID', idX, y)
+    pdf.text('Name', nameX, y)
+    pdf.text('Count', countX, y, { align: 'right' })
+    pdf.text('Usage', percentX, y, { align: 'right' })
+    pdf.text('Bags', bagsX, y, { align: 'right' })
+
+    y += 10
   }
 
-  drawHeader('Color Summary')
+  drawHeader('Materials List')
 
   for (const item of summaryItems) {
     if (y + rowHeight > pageHeight - margin) {
       pdf.addPage()
       y = 22
-      drawHeader('Color Summary - Continued')
+      drawHeader('Materials List - Continued')
     }
 
     const color = hexToRgb(item.hex)
+    const percentage =
+      totalBeads > 0
+        ? (item.count / totalBeads) * 100
+        : 0
+    const estimatedBags = Math.ceil(
+      item.count / beadsPerBag,
+    )
 
     pdf.setFillColor(color.r, color.g, color.b)
     pdf.setDrawColor(156, 163, 175)
+
     pdf.rect(
-      margin,
+      colorX,
       y - 5.5,
       7,
       7,
@@ -115,28 +163,34 @@ export function drawColorSummary({
     )
 
     pdf.setTextColor(31, 41, 55)
-    pdf.setFontSize(10)
+    pdf.setFontSize(9)
+
+    pdf.text(item.id, idX, y)
+    pdf.text(item.name, nameX, y)
 
     pdf.text(
-      item.id,
-      margin + 12,
+      item.count.toLocaleString(),
+      countX,
       y,
+      { align: 'right' },
     )
 
     pdf.text(
-      item.name,
-      margin + 34,
+      `${percentage.toFixed(1)}%`,
+      percentX,
       y,
+      { align: 'right' },
     )
 
     pdf.text(
-      `${item.count} beads`,
-      pageWidth - margin,
+      `${estimatedBags}`,
+      bagsX,
       y,
       { align: 'right' },
     )
 
     pdf.setDrawColor(229, 231, 235)
+
     pdf.line(
       margin,
       y + 3,
@@ -146,4 +200,50 @@ export function drawColorSummary({
 
     y += rowHeight
   }
+
+  y += 5
+
+  if (y + 28 > pageHeight - margin) {
+    pdf.addPage()
+    y = 22
+  }
+
+  const totalEstimatedBags = summaryItems.reduce(
+    (total, item) =>
+      total + Math.ceil(item.count / beadsPerBag),
+    0,
+  )
+
+  pdf.setFillColor(245, 243, 255)
+  pdf.setDrawColor(196, 181, 253)
+
+  pdf.rect(
+    margin,
+    y,
+    pageWidth - margin * 2,
+    24,
+    'FD',
+  )
+
+  pdf.setTextColor(76, 29, 149)
+  pdf.setFontSize(11)
+
+  pdf.text(
+    `Total beads: ${totalBeads.toLocaleString()}`,
+    margin + 6,
+    y + 8,
+  )
+
+  pdf.text(
+    `Total colors: ${summaryItems.length}`,
+    margin + 6,
+    y + 15,
+  )
+
+  pdf.text(
+    `Estimated bags: ${totalEstimatedBags}`,
+    pageWidth - margin - 6,
+    y + 11,
+    { align: 'right' },
+  )
 }

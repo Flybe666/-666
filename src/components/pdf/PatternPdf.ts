@@ -4,14 +4,20 @@ import { splitIntoPages } from './PatternPages'
 import { drawPatternPage } from './PdfGrid'
 import { drawColorSummary } from './ColorSummary'
 import { drawCoverPage } from './CoverPage'
+import {
+  defaultPdfSettings,
+  type PdfSettings,
+} from './PdfSettings'
 type ExportPatternPdfOptions = {
   beadGrid: BeadCell[]
   size: number
+  settings?: PdfSettings
 }
 
 export function exportPatternPdf({
   beadGrid,
   size,
+  settings = defaultPdfSettings,
 }: ExportPatternPdfOptions) {
   if (beadGrid.length === 0) {
     alert('請先完成圖片轉換。')
@@ -21,16 +27,21 @@ export function exportPatternPdf({
 const pages = splitIntoPages(
   size,
   size,
-  25,
-  25,
+  settings.cellsPerPage,
+  settings.cellsPerPage,
 )
-
 const pdf = new jsPDF({
   orientation: 'portrait',
   unit: 'mm',
-  format: 'a4',
+  format: settings.paperSize,
 })
-
+pdf.setProperties({
+  title: `Beads Studio Pattern ${size}x${size}`,
+  subject: 'Printable bead pattern',
+  author: 'Beads Studio',
+  creator: 'Beads Studio',
+  keywords: 'beads, pixel art, pattern, MARD 221',
+})
 drawCoverPage({
   pdf,
   beadGrid,
@@ -45,14 +56,15 @@ pages.forEach((page, index) => {
     pdf.addPage()
   }
 
-  drawPatternPage({
-    pdf,
-    beadGrid,
-    patternPage: page,
-    pages,
-    totalPatternPages: pages.length,
-    patternSize: size,
-  })
+drawPatternPage({
+  pdf,
+  beadGrid,
+  patternPage: page,
+  pages,
+  totalPatternPages: pages.length,
+  patternSize: size,
+  settings,
+})
 })
 
 pdf.addPage()

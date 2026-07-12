@@ -1,7 +1,6 @@
 import type { jsPDF } from 'jspdf'
 import type { BeadCell } from '../../engine/grid'
 import type { PatternPage } from './PatternPages'
-
 type DrawOverviewMapOptions = {
   pdf: jsPDF
   beadGrid: BeadCell[]
