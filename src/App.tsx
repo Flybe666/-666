@@ -1,13 +1,12 @@
 import PatternGrid from './components/PatternGrid'
 import { useRef, useState } from 'react'
 import { exportPatternPdf } from './components/pdf/PatternPdf'
-import { createBeadGrid, type BeadCell } from './engine/grid'
+import type { BeadCell } from './engine/grid'
 import {
   calculateColorStatistics,
   type ColorStatistic,
 } from './engine/statistics'
 import { mard221 } from './data/mard221'
-import { quantizeImageData } from './engine/quantize'
 import { PdfSettingsPanel } from './components/PdfSettingsPanel'
 import {
   defaultPdfSettings,
@@ -16,8 +15,18 @@ import {
 import { PreviewPanel } from './components/pdf/PreviewPanel'
 import { StatisticsPanel } from './components/StatisticsPanel'
 import { createBoardLayout } from './engine/boardLayout'
+import {
+  recalculateStatistics,
+  replaceGridColor,
+} from './engine/materials'
 import type { BoardSection } from './types/board'
 import BoardNavigator from './components/BoardNavigator'
+import { ProSettingsPanel } from './components/ProSettingsPanel'
+import {
+  defaultProProcessingSettings,
+  processImageWithMard,
+  type ProProcessingSettings,
+} from './engine/proProcessor'
 
 const sizes = [29, 58, 104, 128, 208]
 
@@ -65,6 +74,9 @@ function App() {
   const [pdfSettings, setPdfSettings] =
     useState<PdfSettings>(defaultPdfSettings)
 
+  const [proSettings, setProSettings] =
+    useState<ProProcessingSettings>(defaultProProcessingSettings)
+
   function handleFile(file?: File) {
     if (!file || !file.type.startsWith('image/')) {
       return
@@ -85,6 +97,56 @@ setSelectedBoard(null)
 
 
   }
+function renderGridToCanvas(grid: BeadCell[]) {
+  const canvas = sourceCanvasRef.current
+  if (!canvas || grid.length === 0) return
+
+  const context = canvas.getContext('2d')
+  if (!context) return
+
+  const imageData = new ImageData(selectedSize, selectedSize)
+
+  for (let index = 0; index < grid.length; index += 1) {
+    const hex = grid[index].color.hex.replace('#', '')
+    const pixelIndex = index * 4
+
+    imageData.data[pixelIndex] = Number.parseInt(hex.slice(0, 2), 16)
+    imageData.data[pixelIndex + 1] = Number.parseInt(hex.slice(2, 4), 16)
+    imageData.data[pixelIndex + 2] = Number.parseInt(hex.slice(4, 6), 16)
+    imageData.data[pixelIndex + 3] = 255
+  }
+
+  context.putImageData(imageData, 0, 0)
+  context.strokeStyle = 'rgba(0, 0, 0, 0.25)'
+  context.lineWidth = 0.08
+
+  for (let x = 0; x <= selectedSize; x += 1) {
+    context.beginPath()
+    context.moveTo(x, 0)
+    context.lineTo(x, selectedSize)
+    context.stroke()
+  }
+
+  for (let y = 0; y <= selectedSize; y += 1) {
+    context.beginPath()
+    context.moveTo(0, y)
+    context.lineTo(selectedSize, y)
+    context.stroke()
+  }
+}
+
+function replaceColor(sourceColorId: string, targetColorId: string) {
+  const targetColor = mard221.find((color) => color.id === targetColorId)
+  if (!targetColor || beadGrid.length === 0) return
+
+  const updatedGrid = replaceGridColor(beadGrid, sourceColorId, targetColor)
+  setBeadGrid(updatedGrid)
+  setStatistics(recalculateStatistics(updatedGrid))
+  setHoveredColorId(null)
+  setLockedColorId(targetColorId)
+  renderGridToCanvas(updatedGrid)
+}
+
 function convertImage() {
     if (!previewUrl || !sourceCanvasRef.current) return
 
@@ -146,19 +208,20 @@ const originalImageData = context.getImageData(
   selectedSize,
 )
 
-// 3. 建立拼豆資料與顏色統計
-const newBeadGrid = createBeadGrid(originalImageData, mard221)
+// 3. 使用 MARD Studio Pro 處理引擎
+const processed = processImageWithMard(
+  originalImageData,
+  mard221,
+  proSettings,
+)
+
+const newBeadGrid = processed.grid
 const colorStatistics = calculateColorStatistics(newBeadGrid)
 setBeadGrid(newBeadGrid)
 setStatistics(colorStatistics)
 
-// 4. 套用目前的測試色盤
-const convertedImageData = quantizeImageData(
-  originalImageData,
-  mard221,
-)
-
-context.putImageData(convertedImageData, 0, 0)
+// 4. 顯示與設計圖相同的量化結果
+context.putImageData(processed.imageData, 0, 0)
 
 // 5. 最後才畫格線
 context.strokeStyle = 'rgba(0, 0, 0, 0.25)'
@@ -244,7 +307,7 @@ function downloadPdf() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div>
             <h1 className="text-2xl font-bold text-violet-700">
-              Beads Studio
+              MARD Studio Pro
             </h1>
             <p className="text-sm text-gray-500">
               拼豆圖片轉換與設計工具
@@ -252,7 +315,7 @@ function downloadPdf() {
           </div>
 
           <span className="rounded-full bg-violet-100 px-4 py-2 text-sm font-medium text-violet-700">
-            v0.2
+            v2.0 Pro
           </span>
         </div>
       </header>
@@ -322,10 +385,12 @@ onClick={() => {
 <StatisticsPanel
   statistics={statistics}
   beadCount={beadGrid.length}
+  palette={mard221}
   activeColorId={activeColorId}
   lockedColorId={lockedColorId}
   onHoverColor={setHoveredColorId}
   onLockColor={setLockedColorId}
+  onReplaceColor={replaceColor}
 />
 
 <BoardNavigator
@@ -341,11 +406,19 @@ onClick={() => {
             </label>
 
             <select className="w-full rounded-xl border border-gray-200 px-4 py-3">
-              <option>MARD 221</option>
+              <option>MARD 291 Pro</option>
               <option disabled>Artkal（開發中）</option>
               <option disabled>Perler（開發中）</option>
             </select>
           </section>
+
+          <ProSettingsPanel
+            settings={proSettings}
+            onChange={(settings) => {
+              setProSettings(settings)
+              setIsConverted(false)
+            }}
+          />
 
           <PdfSettingsPanel
             settings={pdfSettings}
@@ -395,7 +468,7 @@ onClick={() => {
             </div>
 
             <span className="rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-500">
-              MARD 221
+              MARD 291 Pro
             </span>
           </div>
 
