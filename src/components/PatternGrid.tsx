@@ -10,6 +10,9 @@ import {
 import type { BeadCell } from '../engine/grid'
 import type { BoardSection } from '../types/board'
 import { downloadPatternPng } from './pattern/PatternExport'
+import PatternMiniMap, {
+  type PatternViewport,
+} from './pattern/PatternMiniMap'
 import {
   getRowLabel,
   getTextColor,
@@ -27,6 +30,15 @@ type PatternGridProps = {
   setZoom: Dispatch<SetStateAction<number>>
 }
 
+const INITIAL_VIEWPORT: PatternViewport = {
+  scrollLeft: 0,
+  scrollTop: 0,
+  clientWidth: 0,
+  clientHeight: 0,
+  scrollWidth: 1,
+  scrollHeight: 1,
+}
+
 export default function PatternGrid({
   beadGrid,
   size,
@@ -38,176 +50,292 @@ export default function PatternGrid({
   zoom,
   setZoom,
 }: PatternGridProps) {
-  const activeColorId = lockedColorId ?? hoveredColorId
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const dragStartRef = useRef({ x: 0, y: 0 })
-  const scrollStartRef = useRef({ left: 0, top: 0 })
-  const hasDraggedRef = useRef(false)
-  const [isDragging, setIsDragging] = useState(false)
+  const activeColorId =
+    lockedColorId ?? hoveredColorId
 
-  const cellSize = size <= 29 ? 34 : size <= 58 ? 28 : 24
-  const coordinateSize = 34
-  const gridBaseWidth = coordinateSize + size * cellSize + size
-  const gridBaseHeight = coordinateSize + size * cellSize + size
-useEffect(() => {
-  const container =
-    scrollContainerRef.current
+  const scrollContainerRef =
+    useRef<HTMLDivElement>(null)
 
-  if (!container || !selectedBoard) {
-    return
-  }
-
-  container.scrollTo({
-    left:
-      selectedBoard.startColumn *
-      (cellSize + 1) *
-      zoom,
-
-    top:
-      selectedBoard.startRow *
-      (cellSize + 1) *
-      zoom,
-
-    behavior: 'smooth',
+  const dragStartRef = useRef({
+    x: 0,
+    y: 0,
   })
-}, [
-  selectedBoard,
-  cellSize,
-  zoom,
-])
-useEffect(() => {
-  const container =
-    scrollContainerRef.current
 
-  if (!container) {
-    return
-  }
+  const scrollStartRef = useRef({
+    left: 0,
+    top: 0,
+  })
 
-  const activeContainer = container
+  const hasDraggedRef = useRef(false)
 
-  function handleNativeWheel(
-    event: WheelEvent,
-  ) {
-    event.preventDefault()
+  const [isDragging, setIsDragging] =
+    useState(false)
 
-    const rect =
-      activeContainer.getBoundingClientRect()
+  const [viewport, setViewport] =
+    useState<PatternViewport>(INITIAL_VIEWPORT)
 
-    const mouseX =
-      event.clientX - rect.left
+  const cellSize =
+    size <= 29
+      ? 34
+      : size <= 58
+        ? 28
+        : 24
 
-    const mouseY =
-      event.clientY - rect.top
+  const coordinateSize = 34
 
-    const previousScrollLeft =
-      activeContainer.scrollLeft
+  const gridBaseWidth =
+    coordinateSize +
+    size * cellSize +
+    size
 
-    const previousScrollTop =
-      activeContainer.scrollTop
+  const gridBaseHeight =
+    coordinateSize +
+    size * cellSize +
+    size
 
-    setZoom((current) => {
-      const direction =
-        event.deltaY < 0 ? 0.1 : -0.1
+  function updateViewport() {
+    const container =
+      scrollContainerRef.current
 
-      const next = Math.min(
-        4,
-        Math.max(
-          0.25,
-          Number(
-            (current + direction).toFixed(2),
-          ),
-        ),
-      )
+    if (!container) {
+      return
+    }
 
-      if (next === current) {
-        return current
-      }
-
-      const scale = next / current
-
-      requestAnimationFrame(() => {
-        activeContainer.scrollLeft =
-          (previousScrollLeft + mouseX) *
-            scale -
-          mouseX
-
-        activeContainer.scrollTop =
-          (previousScrollTop + mouseY) *
-            scale -
-          mouseY
-      })
-
-      return next
+    setViewport({
+      scrollLeft: container.scrollLeft,
+      scrollTop: container.scrollTop,
+      clientWidth: container.clientWidth,
+      clientHeight: container.clientHeight,
+      scrollWidth: Math.max(
+        1,
+        container.scrollWidth,
+      ),
+      scrollHeight: Math.max(
+        1,
+        container.scrollHeight,
+      ),
     })
   }
 
-  activeContainer.addEventListener(
-    'wheel',
-    handleNativeWheel,
-    { passive: false },
-  )
+  useEffect(() => {
+    const container =
+      scrollContainerRef.current
 
-  return () => {
-    activeContainer.removeEventListener(
+    if (!container || !selectedBoard) {
+      return
+    }
+
+    container.scrollTo({
+      left:
+        selectedBoard.startColumn *
+        (cellSize + 1) *
+        zoom,
+      top:
+        selectedBoard.startRow *
+        (cellSize + 1) *
+        zoom,
+      behavior: 'smooth',
+    })
+  }, [
+    selectedBoard,
+    cellSize,
+    zoom,
+  ])
+
+  useEffect(() => {
+    const container =
+      scrollContainerRef.current
+
+    if (!container) {
+      return
+    }
+
+    const activeContainer = container
+
+    function handleNativeWheel(
+      event: WheelEvent,
+    ) {
+      event.preventDefault()
+
+      const rect =
+        activeContainer.getBoundingClientRect()
+
+      const mouseX =
+        event.clientX - rect.left
+
+      const mouseY =
+        event.clientY - rect.top
+
+      const previousScrollLeft =
+        activeContainer.scrollLeft
+
+      const previousScrollTop =
+        activeContainer.scrollTop
+
+      setZoom((current) => {
+        const direction =
+          event.deltaY < 0 ? 0.1 : -0.1
+
+        const next = Math.min(
+          4,
+          Math.max(
+            0.25,
+            Number(
+              (
+                current + direction
+              ).toFixed(2),
+            ),
+          ),
+        )
+
+        if (next === current) {
+          return current
+        }
+
+        const scale = next / current
+
+        requestAnimationFrame(() => {
+          activeContainer.scrollLeft =
+            (
+              previousScrollLeft +
+              mouseX
+            ) *
+              scale -
+            mouseX
+
+          activeContainer.scrollTop =
+            (
+              previousScrollTop +
+              mouseY
+            ) *
+              scale -
+            mouseY
+
+          updateViewport()
+        })
+
+        return next
+      })
+    }
+
+    activeContainer.addEventListener(
       'wheel',
       handleNativeWheel,
+      { passive: false },
     )
-  }
-}, [setZoom])
+
+    return () => {
+      activeContainer.removeEventListener(
+        'wheel',
+        handleNativeWheel,
+      )
+    }
+  }, [setZoom])
+
+  useEffect(() => {
+    const container =
+      scrollContainerRef.current
+
+    if (!container) {
+      return
+    }
+
+    const frameId =
+      requestAnimationFrame(
+        updateViewport,
+      )
+
+    const observer =
+      new ResizeObserver(
+        updateViewport,
+      )
+
+    observer.observe(container)
+
+    return () => {
+      cancelAnimationFrame(frameId)
+      observer.disconnect()
+    }
+  }, [
+    zoom,
+    size,
+    beadGrid.length,
+  ])
+
   if (beadGrid.length === 0) {
     return null
   }
 
   const cellMap = new Map(
-    beadGrid.map((cell) => [`${cell.x}-${cell.y}`, cell]),
+    beadGrid.map((cell) => [
+      `${cell.x}-${cell.y}`,
+      cell,
+    ]),
   )
 
-function handleMouseDown(
-  event: MouseEvent<HTMLDivElement>,
-) {
-  const container =
-    scrollContainerRef.current
+  function handleMouseDown(
+    event: MouseEvent<HTMLDivElement>,
+  ) {
+    const container =
+      scrollContainerRef.current
 
-  if (!container) {
-    return
+    if (!container) {
+      return
+    }
+
+    setIsDragging(true)
+    hasDraggedRef.current = false
+
+    dragStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+    }
+
+    scrollStartRef.current = {
+      left: container.scrollLeft,
+      top: container.scrollTop,
+    }
   }
 
-  setIsDragging(true)
-  hasDraggedRef.current = false
-
-  dragStartRef.current = {
-    x: event.clientX,
-    y: event.clientY,
-  }
-
-  scrollStartRef.current = {
-    left: container.scrollLeft,
-    top: container.scrollTop,
-  }
-}
-  function handleMouseMove(event: MouseEvent<HTMLDivElement>) {
-    const container = scrollContainerRef.current
+  function handleMouseMove(
+    event: MouseEvent<HTMLDivElement>,
+  ) {
+    const container =
+      scrollContainerRef.current
 
     if (!isDragging || !container) {
       return
     }
 
-    const dx = event.clientX - dragStartRef.current.x
-    const dy = event.clientY - dragStartRef.current.y
+    const dx =
+      event.clientX -
+      dragStartRef.current.x
 
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+    const dy =
+      event.clientY -
+      dragStartRef.current.y
+
+    if (
+      Math.abs(dx) > 4 ||
+      Math.abs(dy) > 4
+    ) {
       hasDraggedRef.current = true
     }
 
-    container.scrollLeft = scrollStartRef.current.left - dx
-    container.scrollTop = scrollStartRef.current.top - dy
+    container.scrollLeft =
+      scrollStartRef.current.left - dx
+
+    container.scrollTop =
+      scrollStartRef.current.top - dy
   }
 
   function handleMouseUp() {
     setIsDragging(false)
   }
 
-  function handleCellClick(cell?: BeadCell) {
+  function handleCellClick(
+    cell?: BeadCell,
+  ) {
     if (!cell) {
       return
     }
@@ -218,14 +346,57 @@ function handleMouseDown(
     }
 
     onLockColor(
-      lockedColorId === cell.color.id ? null : cell.color.id,
+      lockedColorId === cell.color.id
+        ? null
+        : cell.color.id,
     )
+
     onHoverColor(null)
   }
 
   function clearHighlight() {
     onHoverColor(null)
     onLockColor(null)
+  }
+
+  function navigateFromMiniMap(
+    xRatio: number,
+    yRatio: number,
+  ) {
+    const container =
+      scrollContainerRef.current
+
+    if (!container) {
+      return
+    }
+
+    const targetLeft =
+      xRatio * container.scrollWidth -
+      container.clientWidth / 2
+
+    const targetTop =
+      yRatio * container.scrollHeight -
+      container.clientHeight / 2
+
+    container.scrollTo({
+      left: Math.max(
+        0,
+        Math.min(
+          targetLeft,
+          container.scrollWidth -
+            container.clientWidth,
+        ),
+      ),
+      top: Math.max(
+        0,
+        Math.min(
+          targetTop,
+          container.scrollHeight -
+            container.clientHeight,
+        ),
+      ),
+      behavior: 'smooth',
+    })
   }
 
   return (
@@ -237,13 +408,17 @@ function handleMouseDown(
           </h2>
 
           <p className="text-sm text-gray-500">
-            共 {beadGrid.length} 格（{size} × {size}）
+            共 {beadGrid.length} 格（
+            {size} × {size}）
           </p>
 
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <p className="text-sm font-bold text-violet-700">
-              目前高亮：{activeColorId ?? '無'}
-              {lockedColorId ? '（已鎖定）' : ''}
+              目前高亮：
+              {activeColorId ?? '無'}
+              {lockedColorId
+                ? '（已鎖定）'
+                : ''}
             </p>
 
             {activeColorId && (
@@ -265,7 +440,12 @@ function handleMouseDown(
 
           <button
             type="button"
-            onClick={() => downloadPatternPng({ beadGrid, size })}
+            onClick={() =>
+              downloadPatternPng({
+                beadGrid,
+                size,
+              })
+            }
             className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700"
           >
             下載設計圖 PNG
@@ -275,27 +455,34 @@ function handleMouseDown(
 
       <div
         ref={scrollContainerRef}
+        onScroll={updateViewport}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         className="max-h-[650px] overflow-auto rounded-2xl border border-gray-300 bg-gray-100 p-3"
         style={{
-          cursor: isDragging ? 'grabbing' : 'grab',
+          cursor: isDragging
+            ? 'grabbing'
+            : 'grab',
           userSelect: 'none',
         }}
       >
         <div
           style={{
-            width: `${gridBaseWidth * zoom}px`,
-            height: `${gridBaseHeight * zoom}px`,
+            width:
+              `${gridBaseWidth * zoom}px`,
+            height:
+              `${gridBaseHeight * zoom}px`,
           }}
         >
           <div
             className="grid w-max"
             style={{
-              transform: `scale(${zoom})`,
-              transformOrigin: 'top left',
+              transform:
+                `scale(${zoom})`,
+              transformOrigin:
+                'top left',
               gridTemplateColumns:
                 `${coordinateSize}px repeat(${size}, ${cellSize}px)`,
               gridTemplateRows:
@@ -307,112 +494,192 @@ function handleMouseDown(
               ↘
             </div>
 
-            {Array.from({ length: size }, (_, columnIndex) => (
-              <div
-                key={`column-${columnIndex}`}
-                className="sticky top-0 z-20 flex items-center justify-center bg-gray-700 text-[10px] font-bold text-white"
-              >
-                {columnIndex + 1}
-              </div>
-            ))}
-
-            {Array.from({ length: size }, (_, rowIndex) => (
-              <div key={`row-${rowIndex}`} className="contents">
-                <div className="sticky left-0 z-10 flex items-center justify-center bg-gray-700 text-[10px] font-bold text-white">
-                  {getRowLabel(rowIndex)}
+            {Array.from(
+              { length: size },
+              (_, columnIndex) => (
+                <div
+                  key={
+                    `column-${columnIndex}`
+                  }
+                  className="sticky top-0 z-20 flex items-center justify-center bg-gray-700 text-[10px] font-bold text-white"
+                >
+                  {columnIndex + 1}
                 </div>
+              ),
+            )}
 
-                {Array.from({ length: size }, (_, columnIndex) => {
-                  const cell = cellMap.get(
-                    `${columnIndex}-${rowIndex}`,
-                  )
+            {Array.from(
+              { length: size },
+              (_, rowIndex) => (
+                <div
+                  key={
+                    `row-${rowIndex}`
+                  }
+                  className="contents"
+                >
+                  <div className="sticky left-0 z-10 flex items-center justify-center bg-gray-700 text-[10px] font-bold text-white">
+                    {getRowLabel(
+                      rowIndex,
+                    )}
+                  </div>
 
-                  const isActive =
-                    Boolean(activeColorId) &&
-                    cell?.color.id === activeColorId
+                  {Array.from(
+                    { length: size },
+                    (
+                      _,
+                      columnIndex,
+                    ) => {
+                      const cell =
+                        cellMap.get(
+                          `${columnIndex}-${rowIndex}`,
+                        )
 
-                  const isDimmed =
-                    Boolean(activeColorId) &&
-                    cell?.color.id !== activeColorId
+                      const isActive =
+                        Boolean(
+                          activeColorId,
+                        ) &&
+                        cell?.color.id ===
+                          activeColorId
 
-                  const isSelectedBoard =
-                    selectedBoard !== null &&
-                    rowIndex >= selectedBoard.startRow &&
-                    rowIndex < selectedBoard.endRow &&
-                    columnIndex >= selectedBoard.startColumn &&
-                    columnIndex < selectedBoard.endColumn
+                      const isDimmed =
+                        Boolean(
+                          activeColorId,
+                        ) &&
+                        cell?.color.id !==
+                          activeColorId
 
-                  return (
-                    <div
-                      key={`${columnIndex}-${rowIndex}`}
-                      title={
-                        cell
-                          ? `座標：${getRowLabel(rowIndex)}${columnIndex + 1}｜${cell.color.id} ${cell.color.name}`
-                          : `座標：${getRowLabel(rowIndex)}${columnIndex + 1}`
-                      }
-                      onMouseEnter={() => {
-                        if (!lockedColorId && !isDragging) {
-                          onHoverColor(cell?.color.id ?? null)
-                        }
-                      }}
-                      onMouseLeave={() => {
-                        if (!lockedColorId && !isDragging) {
-                          onHoverColor(null)
-                        }
-                      }}
-                      onClick={() => handleCellClick(cell)}
-                      className={`flex cursor-pointer select-none items-center justify-center overflow-hidden text-[8px] font-bold leading-none transition-opacity duration-150 ${
-                        isDimmed ? 'opacity-20' : 'opacity-100'
-                      }`}
-                      style={{
-                        width: `${cellSize}px`,
-                        height: `${cellSize}px`,
-                        backgroundColor: cell?.color.hex ?? '#FFFFFF',
-                        color: cell
-                          ? getTextColor(cell.color.hex)
-                          : '#111827',
-                        boxShadow: [
-                          isActive
-                            ? 'inset 0 0 0 2px #7C3AED'
-                            : null,
-                          isSelectedBoard
-                            ? 'inset 0 0 0 9999px rgba(124,58,237,0.12)'
-                            : null,
-                        ]
-                          .filter(Boolean)
-                          .join(', '),
-                        position: 'relative',
-                        zIndex: isActive ? 2 : 1,
-                        borderTop:
-                          rowIndex % 29 === 0
-                            ? '2px solid #111827'
-                            : undefined,
-                        borderLeft:
-                          columnIndex % 29 === 0
-                            ? '2px solid #111827'
-                            : undefined,
-                        borderRight:
-                          columnIndex === size - 1
-                            ? '2px solid #111827'
-                            : undefined,
-                        borderBottom:
-                          rowIndex === size - 1
-                            ? '2px solid #111827'
-                            : undefined,
-                      }}
-                    >
-                      {cell?.color.id ?? ''}
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
+                      const isSelectedBoard =
+                        selectedBoard !==
+                          null &&
+                        rowIndex >=
+                          selectedBoard.startRow &&
+                        rowIndex <
+                          selectedBoard.endRow &&
+                        columnIndex >=
+                          selectedBoard.startColumn &&
+                        columnIndex <
+                          selectedBoard.endColumn
+
+                      return (
+                        <div
+                          key={
+                            `${columnIndex}-${rowIndex}`
+                          }
+                          title={
+                            cell
+                              ? `座標：${getRowLabel(rowIndex)}${columnIndex + 1}｜${cell.color.id} ${cell.color.name}`
+                              : `座標：${getRowLabel(rowIndex)}${columnIndex + 1}`
+                          }
+                          onMouseEnter={() => {
+                            if (
+                              !lockedColorId &&
+                              !isDragging
+                            ) {
+                              onHoverColor(
+                                cell?.color.id ??
+                                  null,
+                              )
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            if (
+                              !lockedColorId &&
+                              !isDragging
+                            ) {
+                              onHoverColor(
+                                null,
+                              )
+                            }
+                          }}
+                          onClick={() =>
+                            handleCellClick(
+                              cell,
+                            )
+                          }
+                          className={`flex cursor-pointer select-none items-center justify-center overflow-hidden text-[8px] font-bold leading-none transition-opacity duration-150 ${
+                            isDimmed
+                              ? 'opacity-20'
+                              : 'opacity-100'
+                          }`}
+                          style={{
+                            width:
+                              `${cellSize}px`,
+                            height:
+                              `${cellSize}px`,
+                            backgroundColor:
+                              cell?.color.hex ??
+                              '#FFFFFF',
+                            color: cell
+                              ? getTextColor(
+                                  cell.color.hex,
+                                )
+                              : '#111827',
+                            boxShadow: [
+                              isActive
+                                ? 'inset 0 0 0 2px #7C3AED'
+                                : null,
+                              isSelectedBoard
+                                ? 'inset 0 0 0 9999px rgba(124,58,237,0.12)'
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(', '),
+                            position:
+                              'relative',
+                            zIndex:
+                              isActive
+                                ? 2
+                                : 1,
+                            borderTop:
+                              rowIndex %
+                                29 ===
+                              0
+                                ? '2px solid #111827'
+                                : undefined,
+                            borderLeft:
+                              columnIndex %
+                                29 ===
+                              0
+                                ? '2px solid #111827'
+                                : undefined,
+                            borderRight:
+                              columnIndex ===
+                              size - 1
+                                ? '2px solid #111827'
+                                : undefined,
+                            borderBottom:
+                              rowIndex ===
+                              size - 1
+                                ? '2px solid #111827'
+                                : undefined,
+                          }}
+                        >
+                          {cell?.color.id ??
+                            ''}
+                        </div>
+                      )
+                    },
+                  )}
+                </div>
+              ),
+            )}
           </div>
         </div>
       </div>
 
+      <div className="mt-4 flex justify-end">
+        <PatternMiniMap
+          beadGrid={beadGrid}
+          size={size}
+          viewport={viewport}
+          onNavigate={
+            navigateFromMiniMap
+          }
+        />
+      </div>
+
       <p className="mt-3 text-sm text-gray-500">
-        滾動滑鼠滾輪可縮放；按住滑鼠拖曳可移動畫布。滑鼠移到格子可暫時高亮同色，點擊格子可鎖定高亮。
+        滾動滑鼠滾輪可縮放；按住滑鼠拖曳可移動畫布。Mini Map 可點擊或拖曳快速定位；滑鼠移到格子可暫時高亮同色，點擊格子可鎖定高亮。
       </p>
     </section>
   )

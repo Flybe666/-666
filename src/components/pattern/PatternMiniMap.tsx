@@ -1,14 +1,18 @@
 import type { BeadCell } from '../../engine/grid'
 
+export type PatternViewport = {
+  scrollLeft: number
+  scrollTop: number
+  clientWidth: number
+  clientHeight: number
+  scrollWidth: number
+  scrollHeight: number
+}
+
 type PatternMiniMapProps = {
   beadGrid: BeadCell[]
   size: number
-  viewport: {
-    scrollLeft: number
-    scrollTop: number
-    clientWidth: number
-    clientHeight: number
-  }
+  viewport: PatternViewport
   onNavigate: (
     xRatio: number,
     yRatio: number,
@@ -22,44 +26,53 @@ export default function PatternMiniMap({
   onNavigate,
 }: PatternMiniMapProps) {
   const mapSize = 180
-  const pixel = mapSize / size
 
-  const totalDisplayWidth = mapSize
-  const totalDisplayHeight = mapSize
+  const pixel =
+    size > 0
+      ? mapSize / size
+      : 0
 
   const viewportLeft =
-    size > 0
-      ? (viewport.scrollLeft /
-          (size * pixel)) *
-        mapSize
-      : 0
+    (
+      viewport.scrollLeft /
+      Math.max(
+        1,
+        viewport.scrollWidth,
+      )
+    ) * mapSize
 
   const viewportTop =
-    size > 0
-      ? (viewport.scrollTop /
-          (size * pixel)) *
-        mapSize
-      : 0
+    (
+      viewport.scrollTop /
+      Math.max(
+        1,
+        viewport.scrollHeight,
+      )
+    ) * mapSize
 
   const viewportWidth =
-    size > 0
-      ? (viewport.clientWidth /
-          (size * pixel)) *
-        mapSize
-      : mapSize
+    (
+      viewport.clientWidth /
+      Math.max(
+        1,
+        viewport.scrollWidth,
+      )
+    ) * mapSize
 
   const viewportHeight =
-    size > 0
-      ? (viewport.clientHeight /
-          (size * pixel)) *
-        mapSize
-      : mapSize
+    (
+      viewport.clientHeight /
+      Math.max(
+        1,
+        viewport.scrollHeight,
+      )
+    ) * mapSize
 
   const safeLeft = Math.max(
     0,
     Math.min(
       viewportLeft,
-      totalDisplayWidth - 8,
+      mapSize - 8,
     ),
   )
 
@@ -67,7 +80,7 @@ export default function PatternMiniMap({
     0,
     Math.min(
       viewportTop,
-      totalDisplayHeight - 8,
+      mapSize - 8,
     ),
   )
 
@@ -75,7 +88,7 @@ export default function PatternMiniMap({
     8,
     Math.min(
       viewportWidth,
-      totalDisplayWidth - safeLeft,
+      mapSize - safeLeft,
     ),
   )
 
@@ -83,9 +96,38 @@ export default function PatternMiniMap({
     8,
     Math.min(
       viewportHeight,
-      totalDisplayHeight - safeTop,
+      mapSize - safeTop,
     ),
   )
+
+  function navigateFromPointer(
+    clientX: number,
+    clientY: number,
+    element: HTMLDivElement,
+  ) {
+    const rect =
+      element.getBoundingClientRect()
+
+    const xRatio = Math.max(
+      0,
+      Math.min(
+        1,
+        (clientX - rect.left) /
+          rect.width,
+      ),
+    )
+
+    const yRatio = Math.max(
+      0,
+      Math.min(
+        1,
+        (clientY - rect.top) /
+          rect.height,
+      ),
+    )
+
+    onNavigate(xRatio, yRatio)
+  }
 
   return (
     <div className="rounded-2xl border border-gray-300 bg-white p-3 shadow-sm">
@@ -96,33 +138,50 @@ export default function PatternMiniMap({
       <div
         className="relative cursor-crosshair overflow-hidden border border-gray-300"
         onClick={(event) => {
-          const rect =
-            event.currentTarget.getBoundingClientRect()
+          navigateFromPointer(
+            event.clientX,
+            event.clientY,
+            event.currentTarget,
+          )
+        }}
+        onPointerMove={(event) => {
+          if (event.buttons !== 1) {
+            return
+          }
 
-          const xRatio =
-            (event.clientX - rect.left) /
-            rect.width
-
-          const yRatio =
-            (event.clientY - rect.top) /
-            rect.height
-
-          onNavigate(xRatio, yRatio)
+          navigateFromPointer(
+            event.clientX,
+            event.clientY,
+            event.currentTarget,
+          )
         }}
         style={{
           width: mapSize,
           height: mapSize,
+          touchAction: 'none',
         }}
       >
         {beadGrid.map((cell) => (
           <div
-            key={`${cell.x}-${cell.y}`}
+            key={
+              `${cell.x}-${cell.y}`
+            }
             style={{
               position: 'absolute',
-              left: cell.x * pixel,
-              top: cell.y * pixel,
-              width: Math.max(pixel, 1),
-              height: Math.max(pixel, 1),
+              left:
+                cell.x * pixel,
+              top:
+                cell.y * pixel,
+              width:
+                Math.max(
+                  pixel,
+                  1,
+                ),
+              height:
+                Math.max(
+                  pixel,
+                  1,
+                ),
               backgroundColor:
                 cell.color.hex,
             }}
@@ -139,6 +198,10 @@ export default function PatternMiniMap({
           }}
         />
       </div>
+
+      <p className="mt-2 text-xs text-gray-500">
+        點擊或按住拖曳可快速定位
+      </p>
     </div>
   )
 }
